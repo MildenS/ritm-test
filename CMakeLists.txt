@@ -8,6 +8,7 @@ target_include_directories(GENERATOR_LIB PUBLIC include)
 
 add_subdirectory(tinyxml2)
 
+target_link_libraries(GENERATOR_LIB tinyxml2)
 
 add_executable(${PROJECT_NAME} src/main.cpp)
 
