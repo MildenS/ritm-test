@@ -22,13 +22,21 @@ namespace generator
         xml::XMLElement *root = doc.FirstChildElement("System");
         if (!root)
         {
-            std::cerr << "No <System> root found." << std::endl;
+            std::cerr << "Parser: no <System> root found." << std::endl;
             return ParserResult();
         }
 
-        ParserResult parser_res;
+        ParserResult parser_res = parse_blocks(root);
 
-        for (xml::XMLElement *block_xml = root->FirstChildElement("Block"); block_xml != nullptr; block_xml = block_xml->NextSiblingElement("Block"))
+        parse_lines(parser_res, root);
+        
+        return parser_res;
+    }
+
+    ParserResult Parser::parse_blocks(tinyxml2::XMLElement *root_xml)
+    {
+        ParserResult parser_res;
+        for (xml::XMLElement *block_xml = root_xml->FirstChildElement("Block"); block_xml != nullptr; block_xml = block_xml->NextSiblingElement("Block"))
         {
             std::shared_ptr<BaseBlock> block_ptr;
             BlockType block_type;
@@ -136,8 +144,91 @@ namespace generator
         }
     }
 
-    void Parser::parse_lines(const ParserResult& blocks_ptr, xml::XMLElement *block_xml)
+    void Parser::parse_lines(ParserResult& blocks_ptr, xml::XMLElement *root_xml)
     {
-        
+        if (blocks_ptr.size() == 0)
+            throw std::logic_error("Empty blocks map in parse_lines Parser's method");
+        for (xml::XMLElement *line_xml = root_xml->FirstChildElement("Line"); line_xml != nullptr; line_xml = line_xml->NextSiblingElement("Line"))
+        {
+            parse_line(blocks_ptr, line_xml);  
+        }
+    }
+
+    void Parser::parse_line(ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml)
+    {
+        size_t src_sid;
+        std::unordered_map<uint8_t, size_t> dsts; //dst_in_port - dst_sid
+        for (xml::XMLElement *param = line_xml->FirstChildElement("P"); param != nullptr; param = param->NextSiblingElement("P"))
+        {
+            const char *param_name = param->Attribute("Name");
+            const char *param_value = param->GetText();
+            if (param_name && param_value)
+            {
+                auto param_name_str = std::string(param_name);
+                auto param_value_str = std::string(param_value);
+                if (param_name_str == "Src")
+                {
+                    src_sid = std::stoi(param_value_str);
+                    if (blocks_ptr.find(src_sid) == blocks_ptr.end())
+                        throw std::out_of_range("Parser: line has block with sid = " + std::to_string(src_sid) + "which doesn't parsed");
+                }
+                else if (param_name_str == "Dst")
+                {
+                    size_t dst_sid = std::stoi(param_value_str);
+                    if (blocks_ptr.find(dst_sid) == blocks_ptr.end())
+                        throw std::out_of_range("Parser: line has block with sid = " + std::to_string(dst_sid) + "which doesn't parsed");
+                    size_t colon_pos = param_value_str.find(':');
+                    size_t dst_port = 0;
+                    if (colon_pos != std::string::npos)
+                    {
+                        dst_port = std::stoi(param_value_str.substr(colon_pos + 1));
+                    }
+                    dsts.insert({dst_port, dst_sid});
+                }
+            }
+        }
+        parse_branch(dsts, blocks_ptr, line_xml);
+
+        for (const auto& [dst_port, dst_sid]: dsts)
+        {
+            blocks_ptr[src_sid]->next_blocks.push_back(blocks_ptr[dst_sid]);
+
+            if (is_operation(blocks_ptr[dst_sid]->type))
+            {
+               std::shared_ptr<OperationBlock> oper_block_ptr = std::dynamic_pointer_cast<OperationBlock>(blocks_ptr[dst_sid]);
+               oper_block_ptr->in_ports.insert({dst_port, blocks_ptr[src_sid]});
+            }
+        }
+    }
+
+    void Parser::parse_branch(std::unordered_map<uint8_t, size_t>& dsts, const ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml)
+    {
+        for (xml::XMLElement *branch = line_xml->FirstChildElement("Branch"); branch != nullptr; branch = branch->NextSiblingElement("Branch"))
+        {
+            for (xml::XMLElement *param = branch->FirstChildElement("P"); param != nullptr; param = param->NextSiblingElement("P"))
+            {
+                const char *param_name = param->Attribute("Name");
+                const char *param_value = param->GetText();
+                if (param_name && param_value)
+                {
+                    auto param_name_str = std::string(param_name);
+                    auto param_value_str = std::string(param_value);
+                    if (param_name_str == "Dst")
+                    {
+                        size_t dst_sid = std::stoi(param_value_str);
+                        if (blocks_ptr.find(dst_sid) == blocks_ptr.end())
+                            throw std::out_of_range("Parser: line has block with sid = " + std::to_string(dst_sid) + "which doesn't parsed");
+                        size_t colon_pos = param_value_str.find(':');
+                        size_t dst_port = 0;
+                        if (colon_pos != std::string::npos)
+                        {
+                            dst_port = std::stoi(param_value_str.substr(colon_pos + 1));
+                        }
+                        std::cout << dst_sid << " " << dst_port << std::endl;
+                        dsts.insert({dst_port, dst_sid});
+                    }
+                }
+            }
+        }
     }
 }

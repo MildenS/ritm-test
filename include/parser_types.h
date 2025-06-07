@@ -22,7 +22,7 @@ struct BaseBlock
     std::string name;
     BlockType type;
     size_t sid;
-    std::weak_ptr<BaseBlock> next_block;
+    std::vector<std::weak_ptr<BaseBlock>> next_blocks;
     bool is_port;
     virtual ~BaseBlock() {};
 };
