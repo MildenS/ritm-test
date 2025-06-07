@@ -1,5 +1,6 @@
 #include "parser.h"
 #include <iostream>
+#include <algorithm>
 
 namespace generator
 {
@@ -87,7 +88,10 @@ namespace generator
             throw std::logic_error("Empty block pointer in parse_block Parser's method");
         }
 
-        block_ptr->name = name;
+        std::string name_no_spaces = name;
+        name_no_spaces.erase(std::remove_if(name_no_spaces.begin(), name_no_spaces.end(), [](unsigned char c)
+                                 { return std::isspace(c); }), name_no_spaces.end());
+        block_ptr->name = name_no_spaces;
         block_ptr->sid = std::stoi(sid);
         block_ptr->type = block_type;
         block_ptr->is_port = false;
@@ -224,7 +228,6 @@ namespace generator
                         {
                             dst_port = std::stoi(param_value_str.substr(colon_pos + 1));
                         }
-                        std::cout << dst_sid << " " << dst_port << std::endl;
                         dsts.insert({dst_port, dst_sid});
                     }
                 }
