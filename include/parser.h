@@ -27,7 +27,7 @@ private:
 
     void parse_lines(ParserResult& blocks_ptr, tinyxml2::XMLElement *root_xml);
     void parse_line(ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml);
-    void parse_branch(std::unordered_map<uint8_t, size_t>& dsts, const ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml);
+    void parse_branch(std::vector<std::pair<uint8_t, size_t>>& dsts, const ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml);
 
     tinyxml2::XMLDocument doc;
 };

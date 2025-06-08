@@ -10,8 +10,8 @@ namespace generator
 
 enum BlockType
 {
-    INPORT = 0,
-    OUTPORT,
+    OUTPORT = 0,
+    INPORT,
     SUM,
     GAIN,
     UNIT_DELAY
@@ -24,6 +24,7 @@ struct BaseBlock
     size_t sid;
     std::vector<std::weak_ptr<BaseBlock>> next_blocks;
     bool is_port;
+    std::string port_name; // if is_port = true
     virtual ~BaseBlock() {};
 };
 
@@ -55,6 +56,11 @@ struct OperationBlock: BaseBlock
     std::string inputs; //for add operations it may have value like "+-"; empty string means "++"
     std::unordered_map<uint8_t, std::weak_ptr<BaseBlock>> in_ports; // in_port-value
     double gain; //for gain operation
+};
+
+struct UnitDelayBlock: BaseBlock
+{
+   std::weak_ptr<BaseBlock> input; 
 };
 
 using ParserResult = std::unordered_map<size_t, std::shared_ptr<BaseBlock>>; //sid - block pointer

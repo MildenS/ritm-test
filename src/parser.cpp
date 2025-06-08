@@ -62,6 +62,10 @@ namespace generator
             {
                 block_ptr = std::make_shared<OperationBlock>();
             }
+            else if (block_type == BlockType::UNIT_DELAY)
+            {
+                block_ptr = std::make_shared<UnitDelayBlock>();
+            }
             else
             {
                 block_ptr = std::make_shared<BaseBlock>();
@@ -100,16 +104,17 @@ namespace generator
         {
             for (xml::XMLElement *param = port->FirstChildElement("P"); param != nullptr; param = param->NextSiblingElement("P"))
             {
-                const char *paramName = param->Attribute("Name");
-                const char *paramValue = param->GetText();
-                if (paramName && paramValue)
+                const char *param_name = param->Attribute("Name");
+                const char *param_value = param->GetText();
+                if (param_name && param_value)
                 {
+                    std::string param_name_str = param_name;
+                    std::string param_value_str = param_value;
                     block_ptr->is_port = true;
-                    break;
+                    if (param_name_str == "Name")
+                        block_ptr->port_name = param_value_str;
                 }
             }
-            if (block_ptr->is_port)
-                break;
         }
 
         if (is_operation(block_type))
@@ -161,7 +166,7 @@ namespace generator
     void Parser::parse_line(ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml)
     {
         size_t src_sid;
-        std::unordered_map<uint8_t, size_t> dsts; //dst_in_port - dst_sid
+        std::vector<std::pair<uint8_t, size_t>> dsts; //dst_in_port - dst_sid
         for (xml::XMLElement *param = line_xml->FirstChildElement("P"); param != nullptr; param = param->NextSiblingElement("P"))
         {
             const char *param_name = param->Attribute("Name");
@@ -187,7 +192,7 @@ namespace generator
                     {
                         dst_port = std::stoi(param_value_str.substr(colon_pos + 1));
                     }
-                    dsts.insert({dst_port, dst_sid});
+                    dsts.push_back({dst_port, dst_sid});
                 }
             }
         }
@@ -202,10 +207,16 @@ namespace generator
                std::shared_ptr<OperationBlock> oper_block_ptr = std::dynamic_pointer_cast<OperationBlock>(blocks_ptr[dst_sid]);
                oper_block_ptr->in_ports.insert({dst_port, blocks_ptr[src_sid]});
             }
+
+            if (blocks_ptr[dst_sid]->type == BlockType::UNIT_DELAY)
+            {
+                std::shared_ptr<UnitDelayBlock> ud_block_ptr = std::dynamic_pointer_cast<UnitDelayBlock>(blocks_ptr[dst_sid]);
+                ud_block_ptr->input = blocks_ptr[src_sid];
+            }
         }
     }
 
-    void Parser::parse_branch(std::unordered_map<uint8_t, size_t>& dsts, const ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml)
+    void Parser::parse_branch(std::vector<std::pair<uint8_t, size_t>>& dsts, const ParserResult& blocks_ptr, tinyxml2::XMLElement *line_xml)
     {
         for (xml::XMLElement *branch = line_xml->FirstChildElement("Branch"); branch != nullptr; branch = branch->NextSiblingElement("Branch"))
         {
@@ -228,7 +239,7 @@ namespace generator
                         {
                             dst_port = std::stoi(param_value_str.substr(colon_pos + 1));
                         }
-                        dsts.insert({dst_port, dst_sid});
+                        dsts.push_back({dst_port, dst_sid});
                     }
                 }
             }
